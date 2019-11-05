@@ -10,7 +10,7 @@ import random
 from collections import defaultdict
 
 #Get player names
-player_names = ["Timothy"]
+player_names = ["Annie","*Ben","*Carla"]
 
 #number of curses and victory cards
 if len(player_names)>2:
@@ -37,7 +37,7 @@ box["Adventurer"]=[Dominion.Adventurer()]*10
 box["Feast"]=[Dominion.Feast()]*10
 box["Mine"]=[Dominion.Mine()]*10
 box["Library"]=[Dominion.Library()]*10
-box["Garden"]=[Dominion.Garden()]*nV
+box["Gardens"]=[Dominion.Gardens()]*nV
 box["Moat"]=[Dominion.Moat()]*10
 box["Council Room"]=[Dominion.Council_Room()]*10
 box["Witch"]=[Dominion.Witch()]*10
@@ -49,7 +49,7 @@ box["Throne Room"]=[Dominion.Throne_Room()]*10
 
 supply_order = {0:['Curse','Copper'],2:['Estate','Cellar','Chapel','Moat'],
                 3:['Silver','Chancellor','Village','Woodcutter','Workshop'],
-                4:['Garden','Bureaucrat','Feast','Militia','Moneylender','Remodel','Smithy','Spy','Thief','Throne Room'],
+                4:['Gardens','Bureaucrat','Feast','Militia','Moneylender','Remodel','Smithy','Spy','Thief','Throne Room'],
                 5:['Duchy','Market','Council Room','Festival','Laboratory','Library','Mine','Witch'],
                 6:['Gold','Adventurer'],8:['Province']}
 

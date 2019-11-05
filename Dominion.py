@@ -52,9 +52,9 @@ class Province(Victory_card):
     def __init__(self):
         Victory_card.__init__(self,"Province",8,6)
 
-class Garden(Victory_card):
+class Gardens(Victory_card):
     def __init__(self):
-        Victory_card.__init__(self,"Garden",4,0)
+        Victory_card.__init__(self,"Gardens",4,0)
 
 class Curse(Card):
     def __init__(self):
@@ -365,17 +365,16 @@ class Throne_Room(Action_card):
 class Player():
     def __init__(self,name):
         self.name = name
-        deal = [Copper()]*7 + [Estate()]*3
-        random.shuffle(deal)
-        self.hand = deal[:5]
-        self.deck = deal[5:]
+        self.hand = []
+        self.deck = [Copper()]*7 + [Estate()]*3
+        random.shuffle(self.deck)
         self.played = []
         self.discard = []
         self.aside = []
         self.hold = []
-        random.shuffle(self.deck)
         for i in range(5):
-            self.draw
+            self.draw()
+
     def other(self):
         return self.played+self.discard+self.hold+self.aside
     def stack(self):
@@ -496,7 +495,7 @@ class Player():
         for c in self.stack():
             tally += c.vpoints
             n += 1
-            if c.name == "Garden":
+            if c.name == "Gardens":
                 gardens+=1
         return tally + n//10 * gardens
 
@@ -509,13 +508,13 @@ class ComputerPlayer(Player):
         self.buygaintable1 = ["Province","Gold","Laboratory","Festival","Witch",
         "Council Room","Market","Militia","Adventurer","Smithy","Bureaucrat","Silver","Moat",""]
         #end of game        
-        self.buygaintable2 = ["Province","Garden","Duchy","Estate","Gold","Silver",""]
+        self.buygaintable2 = ["Province","Gardens","Duchy","Estate","Gold","Silver",""]
         #beginning and middle of the game, too many action cards
         self.buygaintable3 = ["Province","Gold","Festival","Laboratory","Market","Village",
         "Silver",""]
         self.playtable1 = ["Village","Festival","Market","Laboratory","Witch",
         "Council Room","Militia","Adventurer","Smithy","Bureaucrat","Moat",""]
-        self.discardtable1 = ["Garden","Duchy","Province","Estate","Curse","Copper",
+        self.discardtable1 = ["Gardens","Duchy","Province","Estate","Curse","Copper",
         "Village","Bureaucrat","Silver","Militia","Smithy","Council Room","Witch",
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
         
@@ -531,7 +530,7 @@ class ComputerPlayer(Player):
             if playthis:
                 c = self.getcard(playthis,supply,self.hand,"your hand",['action'])
                 if c:
-                    #print (self.name + " plays " + c.name)
+                    print (self.name + " plays " + c.name)
                     self.actions = self.actions - 1
                     c.use(self,trash)
                     self.index=0                    
@@ -564,7 +563,7 @@ class ComputerPlayer(Player):
                     self.index = 0
                     self.buys = self.buys -1
                     self.purse = self.purse - c.cost
-                    #print (self.name + " bought " + c.name)
+                    print (self.name + " bought " + c.name)
                 else:
                     self.index += 1
                     
@@ -627,7 +626,7 @@ class TablePlayer(ComputerPlayer):
             print(name)
         self.playtable1 = ["Village","Festival","Market","Laboratory","Witch",
         "Council Room","Militia","Adventurer","Smithy","Bureaucrat","Moat",""]
-        self.discardtable1 = ["Garden","Duchy","Province","Estate","Curse","Copper",
+        self.discardtable1 = ["Gardens","Duchy","Province","Estate","Curse","Copper",
         "Village","Bureaucrat","Silver","Militia","Smithy","Council Room","Witch",
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
     
