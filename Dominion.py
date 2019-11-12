@@ -461,15 +461,15 @@ class Player():
 
     def show(self):
         print (self.name)
-        print ("hand:  ", namesinlist(self.hand))
-        shuffled_deck = namesinlist(self.deck)
-        random.shuffle(shuffled_deck)
-        print ("deck (not in order):  ", shuffled_deck)
-        print ("discard: ", namesinlist(self.discard))
+        print ("hand:", ", ".join(sorted(namesinlist(self.hand))))
+        if len(self.deck)>0:
+            print ("deck (alphabetical order):", ", ".join(sorted(namesinlist(self.deck))))
+        if len(self.discard)>0:
+            print ("discard:", ", ".join(sorted(namesinlist(self.discard))))
         if len(self.played)>0:
-            print ("played: ", namesinlist(self.played))
+            print ("played:", ", ".join(sorted(namesinlist(self.played))))
         if len(self.aside)>0:
-            print ("aside: ",namesinlist(self.aside))
+            print ("aside:", ", ".join(sorted(namesinlist(self.aside))))
         print ("\r")
     
     def action_balance(self):
@@ -486,6 +486,7 @@ class Player():
                 summary[c.name] += 1
             else:
                 summary[c.name] = 1
+        summary['VICTORY POINTS']=self.calcpoints()
         return summary
 
     def calcpoints(self):
@@ -738,6 +739,15 @@ def totalbuypower(cardlist):
         if c.category == "action":
             TBP += c.coins
     return TBP
+
+def cardsummaries(players):
+    cardsums={}
+    for player in players:
+        cardsums[player.name]=player.cardsummary()
+    cardsdf = pandas.DataFrame(cardsums).fillna(0).sort_index()
+    vp=cardsdf.loc[['VICTORY POINTS']]
+    cardsdf.drop(['VICTORY POINTS'],inplace=True)
+    return pandas.concat([cardsdf,vp],axis=0).fillna(0).astype(int)
 
 def countsupply(supply,form):
     return [len(supply[a]) for a in form]

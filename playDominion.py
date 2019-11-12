@@ -103,10 +103,17 @@ while not Dominion.gameover(supply):
             
 
 #Final score
-print ("\r")
-for player in players:
-    print (player.name,player.calcpoints())
+dcs=Dominion.cardsummaries(players)
+vp=dcs.loc['VICTORY POINTS']
+vpmax=vp.max()
+winners=[]
+for i in vp.index:
+    if vp.loc[i]==vpmax:
+        winners.append(i)
+if len(winners)>1:
+    winstring= ' and '.join(winners) + ' win!'
+else:
+    winstring = ' '.join([winners[0],'wins!'])
 
-print ("\n")
-for player in players:
-    print (player.name,player.cardsummary())
+print("\nGAME OVER!!!\n"+winstring+"\n")
+print(dcs)
