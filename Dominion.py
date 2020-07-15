@@ -391,11 +391,22 @@ class Player():
             c = self.deck.pop(0)
             dest.append(c)
             return c
+    def start_turn(self):
+        print("\n")
+        self.actions=1
+        self.buys=1
+        self.purse=0
+        
+    def cleanup(self):
+        self.discard = self.discard + self.played + self.hand + self.aside
+        self.played = []
+        self.hand = []
+        self.aside = []
+        for i in range(5):
+            self.draw()
+
     def turn(self,players,supply,trash):
-        sys.stdout.write("\n")
-        self.actions = 1
-        self.buys = 1
-        self.purse = 0
+        self.start_turn()
         #action phase
         while self.actions>0 and 'action' in catinlist(self.hand):
             self.show(lead="\n")
@@ -430,13 +441,7 @@ class Player():
                     self.buys = self.buys -1
                     self.purse = self.purse - c.cost
                     
-        #cleanup phase
-        self.discard = self.discard + self.played + self.hand + self.aside
-        self.played = []
-        self.hand = []
-        self.aside = []
-        for i in range(5):
-            self.draw()
+        self.cleanup()
 
     def gaincard(self,supply,upto):
         while True:
@@ -519,11 +524,7 @@ class ComputerPlayer(Player):
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
         
     def turn(self,players,supply,trash):
-        print("")
-        self.show(lead="\n")
-        self.actions = 1
-        self.buys = 1
-        self.purse = 0
+        self.start_turn()
         #action phase
         self.index = 0
         while self.actions>0 and 'action' in catinlist(self.hand):
@@ -568,13 +569,8 @@ class ComputerPlayer(Player):
                 else:
                     self.index += 1
                     
-        #cleanup phase
-        self.discard = self.discard + self.played + self.hand + self.aside
-        self.played = []
-        self.hand = []
-        self.aside = []
-        for i in range(5):
-            self.draw()
+        self.cleanup()
+
     
     def getcard(self,name,supply,target_list=None,target_name= "the supply anymore",categories=['action','coin','curse','victory'],upto=100):
         if not name in supply:
@@ -632,10 +628,7 @@ class TablePlayer(ComputerPlayer):
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
     
     def turn(self,players,supply,trash):
-        self.show()
-        self.actions = 1
-        self.buys = 1
-        self.purse = 0
+        self.start.turn()
         #action phase
         self.index = 0
         while self.actions>0 and 'action' in catinlist(self.hand):
@@ -677,13 +670,7 @@ class TablePlayer(ComputerPlayer):
                 else:
                     self.index += 1
                     
-        #cleanup phase
-        self.discard = self.discard + self.played + self.hand + self.aside
-        self.played = []
-        self.hand = []
-        self.aside = []
-        for i in range(5):
-            self.draw()
+        self.cleanup()
     
         
 def gameover(supply):
