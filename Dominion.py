@@ -4,6 +4,7 @@ Created on Tue Oct 13 15:26:55 2015
 
 @author: tfleck
 """
+#1. Import modules
 import random
 from collections import Counter, OrderedDict, defaultdict
 from operator import itemgetter
@@ -11,6 +12,7 @@ import re
 import pandas
 import sys, os
 
+#2. Define card classes
 class Card():
     def __init__(self,name,category,cost,buypower,vpoints):
         self.name = name
@@ -274,7 +276,6 @@ class Bureaucrat(Action_card):
                             break
                 else:
                     player.show(lead="\n\n")
-                    
                         
 class Militia(Action_card):
     def __init__(self):
@@ -308,7 +309,7 @@ class Spy(Action_card):
                 if not b:
                     continue
                 else:
-                    print("The first card in the deck of " + player.name + " is " + b.name)
+                    this_player.hprint("The first card in the deck of " + player.name + " is " + b.name)
                     if this_player.yesnoinput(this_player.name + ", do you want " + player.name + " to discard this?",
                     ", discard",", keep"):
                         player.discard.append(b)
@@ -326,7 +327,7 @@ class Thief(Action_card):
             else:
                 for i in range(2):
                     player.draw(player.hold)
-                print( player.name, namesinlist(player.hold))
+                this_player.hprint(( player.name, namesinlist(player.hold)))
                 if "coin" in catinlist(player.hold):
                     while True:
                         burn = input("Which card would you like " + player.name + " to trash?\n-->")                
@@ -358,9 +359,10 @@ class Throne_Room(Action_card):
                     c.play(player,players,supply,trash)
                     break
 
-                
+#3. Define player classes
 class Player():
-    def __init__(self,name,order):
+
+    def __init__(self,name,order,suppress_printing):
         self.name = name
         self.order = order
         self.hand = []
@@ -375,8 +377,10 @@ class Player():
 
     def other(self):
         return self.played+self.discard+self.hold+self.aside
+
     def stack(self):
         return (self.deck + self.hand + self.played + self.discard + self.aside + self.hold)
+
     def draw(self,dest=None):
         #defualt destination is player's hand
         if dest==None:
@@ -391,8 +395,8 @@ class Player():
             c = self.deck.pop(0)
             dest.append(c)
             return c
+
     def start_turn(self):
-        print("\n")
         self.actions=1
         self.buys=1
         self.purse=0
@@ -452,7 +456,7 @@ class Player():
                 supply[gain].remove(c)
                 break
     def yesnoinput(self,prompt,yesstring='',nostring=''):
-        print(prompt + "\n1 - Yes" + yesstring + "\n0 - No" + nostring)
+        self.hprint(prompt + "\n1 - Yes" + yesstring + "\n0 - No" + nostring)
         while True:
             r = input("--> ")        
             if r == "0":
@@ -463,6 +467,11 @@ class Player():
     def choose_discard(self,prompt):
         return str(input(prompt))
 
+    def hprint(self,string):
+        print(string)
+    def cprint(self,string):
+        pass
+    
     def show(self,lead=""):
         print (lead+self.name)
         print ("hand:", ", ".join(namesinlist(self.hand)))
@@ -505,8 +514,9 @@ class Player():
         return tally + n//10 * gardens
 
 class ComputerPlayer(Player):
-    def __init__(self,name,order):
-        Player.__init__(self,name,order)
+
+    def __init__(self,name,order,sp):
+        Player.__init__(self,name,order,sp)
         self.index = 0
         self.buygaintable = []
         #beginning and middle of game
@@ -522,7 +532,8 @@ class ComputerPlayer(Player):
         self.discardtable1 = ["Gardens","Duchy","Province","Estate","Curse","Copper",
         "Village","Bureaucrat","Silver","Militia","Smithy","Council Room","Witch",
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
-        
+        self.sp=sp
+                
     def turn(self,players,supply,trash):
         self.start_turn()
         #action phase
@@ -532,7 +543,7 @@ class ComputerPlayer(Player):
             if playthis:
                 c = self.getcard(playthis,supply,self.hand,"your hand",['action'])
                 if c:
-                    sys.stdout.write(self.name + " plays " + c.name+ ". ")
+                    self.cprint(self.name + " plays " + c.name+ ". ")
                     self.actions = self.actions - 1
                     c.use(self,trash)
                     self.index=0                    
@@ -565,7 +576,7 @@ class ComputerPlayer(Player):
                     self.index = 0
                     self.buys = self.buys -1
                     self.purse = self.purse - c.cost
-                    sys.stdout.write(self.name + " bought " + c.name+". ")
+                    self.cprint(self.name + " bought " + c.name+". ")
                 else:
                     self.index += 1
                     
@@ -574,13 +585,13 @@ class ComputerPlayer(Player):
     
     def getcard(self,name,supply,target_list=None,target_name= "the supply anymore",categories=['action','coin','curse','victory'],upto=100):
         if not name in supply:
-            #print name + " is not in this game."
+            self.hprint( name + " is not in this game.")
             return None
         if not target_list:
             target_list = supply[name]
         nameslist = namesinlist(target_list)
         if not name in nameslist:
-            #print "There is no " + name + " in " + target_name
+            self.hprint( "There is no " + name + " in " + target_name)
             return None
         i = nameslist.index(name)
         c = target_list[i]
@@ -588,10 +599,10 @@ class ComputerPlayer(Player):
             catstring = categories[0]
             for i in categories[1:]:
                 catstring = catstring + " or " + categories[i]
-            #print name + " is not a " + catstring + " card."
+            self.hprint( name + " is not a " + catstring + " card.")
             return None
         if c.cost > upto:
-            #print name + " costs " + str(c.cost)
+            self.hprint( name + " costs " + str(c.cost))
             return None
         return c
     
@@ -608,12 +619,19 @@ class ComputerPlayer(Player):
     def yesnoinput(self,prompt,yesstring='',nostring=''):
         return True
 
+    def hprint(self,string):
+        pass
+    
+    def cprint(self,string):
+        if not self.sp:
+            print(string)
+    
     def show(self,lead=""):
         pass
 
 class TablePlayer(ComputerPlayer):
-    def __init__(self,name,order):
-        ComputerPlayer.__init__(self,name,order) 
+    def __init__(self,name,order,sp):
+        ComputerPlayer.__init__(self,name,order,sp) 
         self.index=0
         self.buygaintable=[]
         q=re.match(r'([a-zA-Z]+)(\d+)',name)
@@ -636,7 +654,7 @@ class TablePlayer(ComputerPlayer):
             if playthis:
                 c = self.getcard(playthis,supply,self.hand,"your hand",['action'])
                 if c:
-                    #print (self.name + " plays " + c.name)
+                    self.cprint (self.name + " plays " + c.name)
                     self.actions = self.actions - 1
                     c.use(self,trash)
                     self.index=0                    
@@ -672,7 +690,7 @@ class TablePlayer(ComputerPlayer):
                     
         self.cleanup()
     
-        
+#4. Define global functions        
 def gameover(supply):
     if len(supply["Province"])==0:
         return True
@@ -752,10 +770,9 @@ def players_around(players,this_player,inclusive=False):
     else:
         return around[1:]
 
+#5. Define game execution        
 def playgame(player_names,suppress_printing):
-
-    if suppress_printing:
-        sys.stdout=open(os.devnull,'w')
+    sp = suppress_printing
     #number of curses and victory cards
     if len(player_names)>2:
         nV=12
@@ -797,13 +814,11 @@ def playgame(player_names,suppress_printing):
                     5:['Duchy','Market','Council Room','Festival','Laboratory','Library','Mine','Witch'],
                     6:['Gold','Adventurer'],8:['Province']}
     
-    
     #Pick 10 cards from box to be in the supply.
     boxlist = [k for k in box]
     random.shuffle(boxlist)
     random10 = boxlist[:10]
     supply = defaultdict(list,[(k,box[k]) for k in random10])
-    
     
     #The supply always has these cards
     supply["Copper"]=[Copper()]*(60-len(player_names)*7)
@@ -821,11 +836,11 @@ def playgame(player_names,suppress_printing):
     players = []
     for play_order,name in enumerate(player_names):
         if name[0]=="*":
-            players.append(ComputerPlayer(name[1:],play_order))
+            players.append(ComputerPlayer(name[1:],play_order,sp))
         elif name[0]=="^":
-            players.append(TablePlayer(name[1:],play_order))
+            players.append(TablePlayer(name[1:],play_order,sp))
         else:
-            players.append(Player(name,play_order))
+            players.append(Player(name,play_order,sp))
     
     #Play the game
     turn  = 0
@@ -842,11 +857,12 @@ def playgame(player_names,suppress_printing):
                     quantity_list.append(len(supply[stack]))
         supplydf=pandas.DataFrame(data={'Cost':cost_list,'Remaining':quantity_list}\
                                   ,index=name_list)
-        print('\n\nSUPPLY')
-        print(supplydf)
-        print('\r')
-        print(cardsummaries(players).loc[['Total cards','VICTORY POINTS']])
-        sys.stdout.write("\nStart of turn " + str(turn))    
+        if not sp:
+            print('\n\nSUPPLY')
+            print(supplydf)
+            print('\r')
+            print(cardsummaries(players).loc[['Total cards','VICTORY POINTS']])
+            print("\nStart of turn " + str(turn))    
         for player in players:
             if not gameover(supply):
                 player.turn(players,supply,trash)
@@ -877,18 +893,21 @@ def playgame(player_names,suppress_printing):
     else:
         winstring = ' '.join([winners[0],'wins!'])
     
-    print("\n\nGAME OVER!!!   "+winstring+"\n")
+    if not sp:
+        print("\n\nGAME OVER!!!   "+winstring+"\n")
     display_order='Adventurer,Bureaucrat,Cellar,Chancellor,Chapel,Council Room,\
     ,Feast,Festival,Laboratory,Library,Market,Militia,Mine,Moat,Moneylender,\
     ,Remodel,Smithy,Spy,Thief,Throne Room,Village,Witch,Woodcutter,Workshop,\
     ,Gold,Silver,Copper,Province,Duchy,Gardens,Estate,Curse,Total cards,\
     ,VICTORY POINTS'.split(',')
     newindex=[card for card in display_order if card in dcs.index]
-    print(dcs.reindex(newindex))
-    print("\n")
-    if suppress_printing:
+    if sp:
         return winners
+    else:
+        print(dcs.reindex(newindex))
+        print("\n")       
 
+#6. Play game when the file is called
 if __name__ == "__main__":
     names1=["Alex","*Ben","*Claire"]
     playgame(names1,suppress_printing=False)
