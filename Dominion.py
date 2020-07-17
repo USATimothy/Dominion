@@ -362,7 +362,7 @@ class Throne_Room(Action_card):
 #3. Define player classes
 class Player():
 
-    def __init__(self,name,order,suppress_printing):
+    def __init__(self,name,order):
         self.name = name
         self.order = order
         self.hand = []
@@ -409,23 +409,30 @@ class Player():
         for i in range(5):
             self.draw()
 
+    def playcard(self,c,players,supply,trash):
+        self.actions -= 1
+        c.use(self,trash)
+        c.augment(self)
+        c.play(self,players,supply,trash)
+        
+    def choose_action(self):
+        return str(input("Which card would you like to play?  You have "\
+                             + str(self.actions) + " action(s).\
+                             \n-Hit enter for no play. --> "))
+        
     def turn(self,players,supply,trash):
         self.start_turn()
         #action phase
         while self.actions>0 and 'action' in catinlist(self.hand):
             self.show(lead="\n")
-            playthis = input("Which card would you like to play?  You have "\
-                             + str(self.actions) + " action(s).\
-                             \n-Hit enter for no play. --> ")
+            playthis = self.choose_action()
             if playthis:
                 c = getcard(playthis,supply,self.hand,"your hand",['action'])
                 if c:
-                    self.actions = self.actions - 1 
-                    c.use(self,trash)
-                    c.augment(self)
-                    c.play(self,players,supply,trash)
+                    self.cprint(self.name + " plays " + c.name+ ". ")
+                    self.playcard(c,players,supply,trash)
             else:
-                self.actions=0
+                break
         #buy phase
         for c in self.hand:
             self.purse += c.buypower
@@ -515,8 +522,8 @@ class Player():
 
 class ComputerPlayer(Player):
 
-    def __init__(self,name,order,sp):
-        Player.__init__(self,name,order,sp)
+    def __init__(self,name,order,supply,sp):
+        Player.__init__(self,name,order)
         self.index = 0
         self.buygaintable = []
         #beginning and middle of game
@@ -527,33 +534,32 @@ class ComputerPlayer(Player):
         #beginning and middle of the game, too many action cards
         self.buygaintable3 = ["Province","Gold","Festival","Laboratory","Market","Village",
         "Silver",""]
-        self.playtable1 = ["Village","Festival","Market","Laboratory","Witch",
-        "Council Room","Militia","Adventurer","Smithy","Bureaucrat","Moat",""]
+        action_order = ["Village","Festival","Market","Laboratory","Witch",
+        "Council Room","Militia","Adventurer","Smithy","Bureaucrat","Moat"][::-1]
+        lsk = list(supply.keys())
+        self.playtable1 = [i for i in action_order if i in lsk]
         self.discardtable1 = ["Gardens","Duchy","Province","Estate","Curse","Copper",
         "Village","Bureaucrat","Silver","Militia","Smithy","Council Room","Witch",
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
         self.sp=sp
-                
+    
+    def choose_action(self):
+        self.hand.sort(key = lambda x: Findex(x.name,self.playtable1))
+        return self.hand[-1].name
+        
     def turn(self,players,supply,trash):
         self.start_turn()
         #action phase
-        self.index = 0
         while self.actions>0 and 'action' in catinlist(self.hand):
-            playthis = self.playtable1[self.index]
+            playthis = self.choose_action()
             if playthis:
-                c = self.getcard(playthis,supply,self.hand,"your hand",['action'])
+                c = getcard(playthis,supply,self.hand,"your hand",['action'])
                 if c:
                     self.cprint(self.name + " plays " + c.name+ ". ")
-                    self.actions = self.actions - 1
-                    c.use(self,trash)
-                    self.index=0                    
-                    c.augment(self)
-                    c.play(self,players,supply,trash)
-                    self.show()
-                else:
-                    self.index += 1
+                    self.playcard(c,players,supply,trash)
             else:
-                self.actions=0
+                break
+        
         #buy phase
         if len(supply["Province"])>len(players)+totalbuypower(self.deck)/8:
             if self.action_balance()<-10:
@@ -630,7 +636,7 @@ class ComputerPlayer(Player):
         pass
 
 class TablePlayer(ComputerPlayer):
-    def __init__(self,name,order,sp):
+    def __init__(self,name,order,supply,sp):
         ComputerPlayer.__init__(self,name,order,sp) 
         self.index=0
         self.buygaintable=[]
@@ -769,6 +775,13 @@ def players_around(players,this_player,inclusive=False):
         return around[:]
     else:
         return around[1:]
+    
+def Findex(item,List):
+    try:
+        return List.index(item)
+    except:
+        return -1
+
 
 #5. Define game execution        
 def playgame(player_names,suppress_printing):
@@ -836,11 +849,11 @@ def playgame(player_names,suppress_printing):
     players = []
     for play_order,name in enumerate(player_names):
         if name[0]=="*":
-            players.append(ComputerPlayer(name[1:],play_order,sp))
+            players.append(ComputerPlayer(name[1:],play_order,supply,sp))
         elif name[0]=="^":
-            players.append(TablePlayer(name[1:],play_order,sp))
+            players.append(TablePlayer(name[1:],play_order,supply,sp))
         else:
-            players.append(Player(name,play_order,sp))
+            players.append(Player(name,play_order))
     
     #Play the game
     turn  = 0
@@ -909,6 +922,5 @@ def playgame(player_names,suppress_printing):
 
 #6. Play game when the file is called
 if __name__ == "__main__":
-    names1=["Alex","*Ben","*Claire"]
+    names1=["Alex","*Ben"]
     playgame(names1,suppress_printing=False)
-    
