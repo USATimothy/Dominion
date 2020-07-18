@@ -420,6 +420,14 @@ class Player():
                              + str(self.actions) + " action(s).\
                              \n-Hit enter for no play. --> "))
         
+    def choose_buy(self,supply,players):
+        buy_string = "Buying power is " + str(self.purse) + ".  You have " + str(self.buys) + " buy"
+        if self.buys>1:
+            buy_string += "s"
+        buy_string += ". "
+        purchase = input(buy_string+"What would you like to purchase?  \n-Hit enter for no purchase.-   --> ")
+        return purchase
+    
     def turn(self,players,supply,trash):
         self.start_turn()
         #action phase
@@ -438,11 +446,7 @@ class Player():
             self.purse += c.buypower
         self.show(lead="\n")
         while self.buys>0:
-            buy_string = "Buying power is " + str(self.purse) + ".  You have " + str(self.buys) + " buy"
-            if self.buys>1:
-                buy_string += "s"
-            buy_string += ". "
-            purchase = input(buy_string+"What would you like to purchase?  \n-Hit enter for no purchase.-   --> ")
+            purchase = self.choose_buy(supply,players)
             if not purchase:
                 break
             else:
@@ -451,7 +455,7 @@ class Player():
                     self.discard.append(supply[purchase].pop())
                     self.buys = self.buys -1
                     self.purse = self.purse - c.cost
-                    
+                    self.cprint(self.name + " bought " + c.name+". ")
         self.cleanup()
 
     def gaincard(self,supply,upto):
@@ -524,29 +528,51 @@ class ComputerPlayer(Player):
 
     def __init__(self,name,order,supply,sp):
         Player.__init__(self,name,order)
-        self.index = 0
-        self.buygaintable = []
+        print(len(supply))
+        lsk = list(supply.keys())[:]
+        lsk.append("")
         #beginning and middle of game
-        self.buygaintable1 = ["Province","Gold","Laboratory","Festival","Witch",
+        bg1 = ["Province","Gold","Laboratory","Festival","Witch",
         "Council Room","Market","Militia","Adventurer","Smithy","Bureaucrat","Silver","Moat",""]
+        self.buygaintable1 = [i for i in bg1 if i in lsk]
         #end of game        
-        self.buygaintable2 = ["Province","Gardens","Duchy","Estate","Gold","Silver",""]
+        bg2 = ["Province","Gardens","Duchy","Estate","Gold","Silver",""]
+        self.buygaintable2 = [i for i in bg2 if i in lsk]
         #beginning and middle of the game, too many action cards
-        self.buygaintable3 = ["Province","Gold","Festival","Laboratory","Market","Village",
+        bg3 =  ["Province","Gold","Festival","Laboratory","Market","Village",
         "Silver",""]
+        self.buygaintable3 = [i for i in bg3 if i in lsk]
         action_order = ["Village","Festival","Market","Laboratory","Witch",
         "Council Room","Militia","Adventurer","Smithy","Bureaucrat","Moat"][::-1]
-        lsk = list(supply.keys())
         self.playtable1 = [i for i in action_order if i in lsk]
-        self.discardtable1 = ["Gardens","Duchy","Province","Estate","Curse","Copper",
+        discard_order = ["Gardens","Duchy","Province","Estate","Curse","Copper",
         "Village","Bureaucrat","Silver","Militia","Smithy","Council Room","Witch",
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
+        self.discardtable1 = [i for i in discard_order if i in lsk]
         self.sp=sp
     
     def choose_action(self):
         self.hand.sort(key = lambda x: Findex(x.name,self.playtable1))
         return self.hand[-1].name
-        
+    
+    def choose_buy(self,supply,players):
+        if len(supply["Province"])>len(players)+totalbuypower(self.deck)/8:
+            if self.action_balance()<-10:
+                bgt = self.buygaintable3
+            else:
+                bgt = self.buygaintable1
+        else:
+            bgt = self.buygaintable2
+        for c in bgt:
+            if c in supply and len(supply[c])>0 and supply[c][0].cost<=self.purse:
+                return c
+        else:
+            return ""
+
+    def choose_discard(self,prompt):
+        self.hand.sort(key = lambda x: Findex(x.name,self.discardtable1))        
+        return self.hand[0].name
+
     def turn(self,players,supply,trash):
         self.start_turn()
         #action phase
@@ -561,25 +587,17 @@ class ComputerPlayer(Player):
                 break
         
         #buy phase
-        if len(supply["Province"])>len(players)+totalbuypower(self.deck)/8:
-            if self.action_balance()<-10:
-                self.buygaintable = self.buygaintable3
-            else:
-                self.buygaintable = self.buygaintable1
-        else:
-            self.buygaintable = self.buygaintable2
-        self.index = 0
         for c in self.hand:
             self.purse += c.buypower
+        self.show(lead="\n")
         while self.buys>0:
-            purchase = self.buygaintable[self.index]
+            purchase = self.choose_buy(supply,players)
             if not purchase:
                 break
             else:
-                c = self.getcard(purchase,supply,upto=self.purse)
+                c = getcard(purchase,supply,upto=self.purse)
                 if c:
                     self.discard.append(supply[purchase].pop())
-                    self.index = 0
                     self.buys = self.buys -1
                     self.purse = self.purse - c.cost
                     self.cprint(self.name + " bought " + c.name+". ")
@@ -587,41 +605,7 @@ class ComputerPlayer(Player):
                     self.index += 1
                     
         self.cleanup()
-
     
-    def getcard(self,name,supply,target_list=None,target_name= "the supply anymore",categories=['action','coin','curse','victory'],upto=100):
-        if not name in supply:
-            self.hprint( name + " is not in this game.")
-            return None
-        if not target_list:
-            target_list = supply[name]
-        nameslist = namesinlist(target_list)
-        if not name in nameslist:
-            self.hprint( "There is no " + name + " in " + target_name)
-            return None
-        i = nameslist.index(name)
-        c = target_list[i]
-        if c.category not in categories:
-            catstring = categories[0]
-            for i in categories[1:]:
-                catstring = catstring + " or " + categories[i]
-            self.hprint( name + " is not a " + catstring + " card.")
-            return None
-        if c.cost > upto:
-            self.hprint( name + " costs " + str(c.cost))
-            return None
-        return c
-    
-    def choose_discard(self,prompt):
-        index = 0        
-        while True:
-            dis_card = self.discardtable1[index]
-            c = self.getcard(dis_card,[dis_card],self.hand)
-            if c:
-                return c.name
-            else:
-                index+=1
-            
     def yesnoinput(self,prompt,yesstring='',nostring=''):
         return True
 
@@ -656,22 +640,16 @@ class TablePlayer(ComputerPlayer):
         #action phase
         self.index = 0
         while self.actions>0 and 'action' in catinlist(self.hand):
-            playthis = self.playtable1[self.index]
+            playthis = self.choose_action()
             if playthis:
-                c = self.getcard(playthis,supply,self.hand,"your hand",['action'])
+                c = getcard(playthis,supply,self.hand,"your hand",['action'])
                 if c:
-                    self.cprint (self.name + " plays " + c.name)
-                    self.actions = self.actions - 1
-                    c.use(self,trash)
-                    self.index=0                    
-                    c.augment(self)
-                    c.play(self,players,supply,trash)
-                    self.show()
-                else:
-                    self.index += 1
+                    self.cprint(self.name + " plays " + c.name+ ". ")
+                    self.playcard(c,players,supply,trash)
             else:
-                self.actions=0
-        #buy phase
+                break
+        
+         #buy phase
         v= self.number
         csvstring = r"Dominionbuy" + str(v) + ".csv"
         buydf=pandas.read_csv(csvstring,na_filter=False)
@@ -685,7 +663,7 @@ class TablePlayer(ComputerPlayer):
             if not purchase:
                 break
             else:
-                c = self.getcard(purchase,supply,upto=self.purse)
+                c = getcard(purchase,supply,upto=self.purse)
                 if c:
                     self.discard.append(supply[purchase].pop())
                     self.index = 0
@@ -698,12 +676,13 @@ class TablePlayer(ComputerPlayer):
     
 #4. Define global functions        
 def gameover(supply):
-    if len(supply["Province"])==0:
-        return True
+#    if len(supply["Province"])==0:
+#        return True
     out = 0
     for stack in supply:
         if len(supply[stack])==0:
             out+=1
+            print(str(stack) + " is out!")
     if out>=3:
         return True
     return False
@@ -841,7 +820,6 @@ def playgame(player_names,suppress_printing):
     supply["Duchy"]=[Duchy()]*nV
     supply["Province"]=[Province()]*nV
     supply["Curse"]=[Curse()]*nC
-    
     #initialize the trash
     trash = []
     
@@ -922,5 +900,10 @@ def playgame(player_names,suppress_printing):
 
 #6. Play game when the file is called
 if __name__ == "__main__":
-    names1=["Alex","*Ben"]
+    names1=["*Alex","*Ben"]
     playgame(names1,suppress_printing=False)
+    
+#removed unused functions and imports
+#reworked choose_buy so computer and human match
+#simplified choose_discard for computer
+#eliminated internal getcard function for computer player
