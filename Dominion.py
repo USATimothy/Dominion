@@ -4,13 +4,25 @@ Created on Tue Oct 13 15:26:55 2015
 
 @author: tfleck
 """
-#1. Import modules
+#0. Import modules
 import random
-from collections import Counter, OrderedDict, defaultdict
-from operator import itemgetter
 import re
 import pandas
-import sys, os
+
+#1. Define Supply methods
+class Supply(pandas.DataFrame):
+    def gameover(self):
+        if self.loc['Province','quantity']==0:
+            return True
+        else:
+            return False
+    def remove(self,cname):
+        self.loc[cname,'quantity']-=1
+    def has(self,cname):
+        if self.quantity[cname]>0:
+            return True
+        else:
+            return False
 
 #2. Define card classes
 class Card():
@@ -206,14 +218,18 @@ class Mine(Action_card):
             if c:
                 trash.append(c)
                 player.hand.remove(c)
-                while c.cost>2 or len(supply["Copper"])>0 or len(supply["Silver"])>0:
+                while True:
                     pick = input("Choose a coin to gain.  Any coin up to " + str(c.cost+3)+": ")
-                    g = getcard(pick,supply,categories=["coin"],upto=c.cost+3)
-                    if g:
-                        player.hand.append(g)
-                        supply[pick].remove(g)
+                    if pick:
+                        g = getcard(pick,supply,categories=["coin"],upto=c.cost+3)
+                        if g:
+                            player.hand.append(g)
+                            supply.remove(pick)
+                            break
+                        else:
+                            continue
+                    else:
                         break
-                break
 
 class Library(Action_card):
     def __init__(self):
@@ -246,19 +262,21 @@ class Witch(Action_card):
         Action_card.__init__(self,"Witch",5,0,2,0,0)
     def play(self,this_player,players,supply,trash):
         for player in players_around(players,this_player,inclusive=False):
-            if len(supply["Curse"])>0:
+            if supply.has("Curse"):
                 for c in player.hand:
                     if c.react(player):
                         break
                 else:
-                    player.discard.append(supply["Curse"].pop())
+                    player.discard.append(Curse())
+                    supply.remove("Curse")
 
 class Bureaucrat(Action_card):
     def __init__(self):
         Action_card.__init__(self,"Bureaucrat",4,0,0,0,0)
     def play(self,this_player,players,supply,trash):
-        if len(supply["Silver"])>0:
-            this_player.deck.insert(0,supply["Silver"].pop())
+        if supply.has("Silver"):
+            this_player.deck.insert(0,Silver())
+            supply.remove("Silver")
         for player in players_around(players,this_player,inclusive=False):
             for c in player.hand:
                 if c.react(player):
@@ -375,9 +393,6 @@ class Player():
         for i in range(5):
             self.draw()
 
-    def other(self):
-        return self.played+self.discard+self.hold+self.aside
-
     def stack(self):
         return (self.deck + self.hand + self.played + self.discard + self.aside + self.hold)
 
@@ -452,7 +467,8 @@ class Player():
             else:
                 c = getcard(purchase,supply,upto=self.purse)
                 if c:
-                    self.discard.append(supply[purchase].pop())
+                    self.discard.append(c)
+                    supply.remove(purchase)
                     self.buys = self.buys -1
                     self.purse = self.purse - c.cost
                     self.cprint(self.name + " bought " + c.name+". ")
@@ -464,8 +480,9 @@ class Player():
             c = getcard(gain,supply,upto=upto)
             if c:
                 self.discard.append(c)
-                supply[gain].remove(c)
+                supply.remove(gain)
                 break
+            
     def yesnoinput(self,prompt,yesstring='',nostring=''):
         self.hprint(prompt + "\n1 - Yes" + yesstring + "\n0 - No" + nostring)
         while True:
@@ -528,27 +545,25 @@ class ComputerPlayer(Player):
 
     def __init__(self,name,order,supply,sp):
         Player.__init__(self,name,order)
-        print(len(supply))
-        lsk = list(supply.keys())[:]
-        lsk.append("")
+        lsi = list(supply.index)
         #beginning and middle of game
         bg1 = ["Province","Gold","Laboratory","Festival","Witch",
         "Council Room","Market","Militia","Adventurer","Smithy","Bureaucrat","Silver","Moat",""]
-        self.buygaintable1 = [i for i in bg1 if i in lsk]
+        self.buygaintable1 = [i for i in bg1 if i in lsi]
         #end of game        
         bg2 = ["Province","Gardens","Duchy","Estate","Gold","Silver",""]
-        self.buygaintable2 = [i for i in bg2 if i in lsk]
+        self.buygaintable2 = [i for i in bg2 if i in lsi]
         #beginning and middle of the game, too many action cards
         bg3 =  ["Province","Gold","Festival","Laboratory","Market","Village",
         "Silver",""]
-        self.buygaintable3 = [i for i in bg3 if i in lsk]
+        self.buygaintable3 = [i for i in bg3 if i in lsi]
         action_order = ["Village","Festival","Market","Laboratory","Witch",
         "Council Room","Militia","Adventurer","Smithy","Bureaucrat","Moat"][::-1]
-        self.playtable1 = [i for i in action_order if i in lsk]
+        self.playtable1 = [i for i in action_order if i in lsi]
         discard_order = ["Gardens","Duchy","Province","Estate","Curse","Copper",
         "Village","Bureaucrat","Silver","Militia","Smithy","Council Room","Witch",
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
-        self.discardtable1 = [i for i in discard_order if i in lsk]
+        self.discardtable1 = [i for i in discard_order if i in lsi]
         self.sp=sp
     
     def choose_action(self):
@@ -556,7 +571,7 @@ class ComputerPlayer(Player):
         return self.hand[-1].name
     
     def choose_buy(self,supply,players):
-        if len(supply["Province"])>len(players)+totalbuypower(self.deck)/8:
+        if supply.quantity["Province"]>len(players)+totalbuypower(self.deck)/8:
             if self.action_balance()<-10:
                 bgt = self.buygaintable3
             else:
@@ -564,7 +579,7 @@ class ComputerPlayer(Player):
         else:
             bgt = self.buygaintable2
         for c in bgt:
-            if c in supply and len(supply[c])>0 and supply[c][0].cost<=self.purse:
+            if supply.has(c) and supply.cost[c]<=self.purse:
                 return c
         else:
             return ""
@@ -597,7 +612,8 @@ class ComputerPlayer(Player):
             else:
                 c = getcard(purchase,supply,upto=self.purse)
                 if c:
-                    self.discard.append(supply[purchase].pop())
+                    self.discard.append(c)
+                    supply.remove(purchase)
                     self.buys = self.buys -1
                     self.purse = self.purse - c.cost
                     self.cprint(self.name + " bought " + c.name+". ")
@@ -665,7 +681,8 @@ class TablePlayer(ComputerPlayer):
             else:
                 c = getcard(purchase,supply,upto=self.purse)
                 if c:
-                    self.discard.append(supply[purchase].pop())
+                    self.discard.append(c)
+                    supply.remove(purchase)
                     self.index = 0
                     self.buys = self.buys -1
                     self.purse = self.purse - c.cost
@@ -675,18 +692,6 @@ class TablePlayer(ComputerPlayer):
         self.cleanup()
     
 #4. Define global functions        
-def gameover(supply):
-#    if len(supply["Province"])==0:
-#        return True
-    out = 0
-    for stack in supply:
-        if len(supply[stack])==0:
-            out+=1
-            print(str(stack) + " is out!")
-    if out>=3:
-        return True
-    return False
-
 def namesinlist(cardlist):
     namelist = []    
     for c in cardlist:
@@ -699,28 +704,31 @@ def catinlist(cardlist):
         catlist.append(c.category)
     return catlist
 
-def getcard(name,supply,target_list=None,target_name= "the supply anymore",categories=['action','coin','curse','victory'],upto=100):
-    if not name in supply:
+def getcard(name,supply,target='supply',target_name= "the supply anymore",categories=['action','coin','curse','victory'],upto=100):
+    if not name in supply.index:
         print( name + " is not in this game.")
         return None
-    if not target_list:
-        target_list = supply[name]
-    nameslist = namesinlist(target_list)
-    if not name in nameslist:
-        print ("There is no " + name + " in " + target_name)
+    if supply.category[name] not in categories:
+        print (name + " is not a(n) " + " or ".join(categories) + " card.")
         return None
-    i = nameslist.index(name)
-    c = target_list[i]
-    if c.category not in categories:
-        catstring = categories[0]
-        for i in categories[1:]:
-            catstring = catstring + " or " + categories[i]
-        print (name + " is not a " + catstring + " card.")
+    if supply.cost[name] > upto:
+        print (name + " costs " + str(supply.cost[name]))
         return None
-    if c.cost > upto:
-        print (name + " costs " + str(c.cost))
-        return None
-    return c
+    
+    if target=='supply':
+        if supply.has(name):
+            return supply.card[name]
+        else:
+            print ("There is no " + name + " in " + target_name)
+            return None
+    else:
+        nameslist = namesinlist(target)
+        if name in nameslist:
+            i=nameslist.index(name)
+            return target[i]
+        else:
+            print ("There is no " + name + " in " + target_name)
+            return None
 
 def totalbuypower(cardlist):
     TBP = 0
@@ -735,18 +743,6 @@ def cardsummaries(players):
     for player in players:
         cardsums[player.name]=player.cardsummary()
     return pandas.DataFrame(cardsums).fillna(0).astype(int)
-
-def countsupply(supply,form):
-    return [len(supply[a]) for a in form]
-
-def countcards(cards,form):
-    dcount = Counter(namesinlist(cards))
-    return [dcount[a] for a in form]
-
-def rankcards(form,vector):
-    od = OrderedDict(zip(form,vector))
-    sd = OrderedDict(sorted(od.items(),key = itemgetter(1),reverse=True))
-    return list(sd.keys())
 
 def players_around(players,this_player,inclusive=False):
     around=players[this_player.order:]+players[:this_player.order]
@@ -765,61 +761,37 @@ def Findex(item,List):
 #5. Define game execution        
 def playgame(player_names,suppress_printing):
     sp = suppress_printing
-    #number of curses and victory cards
-    if len(player_names)>2:
-        nV=12
-    else:
-        nV=8
-    nC = -10 + 10 * len(player_names)
+    Nplay=len(player_names)
+    #choose cards for initial supply
+    startq={}
+    startq['action']=10
+    startq['curse']=10*(Nplay-1)
+    startq['victory']=8+4*(Nplay>2)
+    startq['Copper']=60-7*Nplay
+    startq['Silver']=40
+    startq['Gold']=30
+    card_list = [Copper(),Silver(),Gold(),Curse(),Estate(),Duchy(),Province()]
+    random10=[Adventurer(),Bureaucrat(),Cellar(),Chancellor(),Chapel(),Council_Room(),
+            Feast(),Festival(),Laboratory(),Library(),Market(),Militia(),Mine(),
+            Moat(),Moneylender(),Remodel(),Smithy(),Spy(),Thief(),Throne_Room(),
+            Village(),Witch(),Woodcutter(),Workshop(),Gardens()]
+    random.shuffle(random10)
+    card_list = card_list + random10[:10]
+    name_list = [c.name for c in card_list]
+    cost_list = [c.cost for c in card_list]
+    cat_list = [c.category for c in card_list]
+    quantity_list = [0]*len(card_list)
+    for i,v in enumerate(cat_list):
+        try:
+            quantity_list[i]=startq[v]
+        except:
+            quantity_list[i]=startq[name_list[i]]
     
-    #Define box
-    box = {}
-    box["Woodcutter"]=[Woodcutter()]*10
-    box["Smithy"]=[Smithy()]*10
-    box["Laboratory"]=[Laboratory()]*10
-    box["Village"]=[Village()]*10
-    box["Festival"]=[Festival()]*10
-    box["Market"]=[Market()]*10
-    box["Chancellor"]=[Chancellor()]*10
-    box["Workshop"]=[Workshop()]*10
-    box["Moneylender"]=[Moneylender()]*10
-    box["Chapel"]=[Chapel()]*10
-    box["Cellar"]=[Cellar()]*10
-    box["Remodel"]=[Remodel()]*10
-    box["Adventurer"]=[Adventurer()]*10
-    box["Feast"]=[Feast()]*10
-    box["Mine"]=[Mine()]*10
-    box["Library"]=[Library()]*10
-    box["Gardens"]=[Gardens()]*nV
-    box["Moat"]=[Moat()]*10
-    box["Council Room"]=[Council_Room()]*10
-    box["Witch"]=[Witch()]*10
-    box["Bureaucrat"]=[Bureaucrat()]*10
-    box["Militia"]=[Militia()]*10
-    box["Spy"]=[Spy()]*10
-    box["Thief"]=[Thief()]*10
-    box["Throne Room"]=[Throne_Room()]*10
+
+    supply = Supply(data={"cost":cost_list,"category":cat_list,"quantity":quantity_list,
+                          "card":card_list},index=name_list)
+    supply.sort_values(by="cost",inplace=True)
     
-    supply_order = {0:['Curse','Copper'],2:['Estate','Cellar','Chapel','Moat'],
-                    3:['Silver','Chancellor','Village','Woodcutter','Workshop'],
-                    4:['Gardens','Bureaucrat','Feast','Militia','Moneylender','Remodel','Smithy','Spy','Thief','Throne Room'],
-                    5:['Duchy','Market','Council Room','Festival','Laboratory','Library','Mine','Witch'],
-                    6:['Gold','Adventurer'],8:['Province']}
-    
-    #Pick 10 cards from box to be in the supply.
-    boxlist = [k for k in box]
-    random.shuffle(boxlist)
-    random10 = boxlist[:10]
-    supply = defaultdict(list,[(k,box[k]) for k in random10])
-    
-    #The supply always has these cards
-    supply["Copper"]=[Copper()]*(60-len(player_names)*7)
-    supply["Silver"]=[Silver()]*40
-    supply["Gold"]=[Gold()]*30
-    supply["Estate"]=[Estate()]*nV
-    supply["Duchy"]=[Duchy()]*nV
-    supply["Province"]=[Province()]*nV
-    supply["Curse"]=[Curse()]*nC
     #initialize the trash
     trash = []
     
@@ -835,31 +807,22 @@ def playgame(player_names,suppress_printing):
     
     #Play the game
     turn  = 0
-    while not gameover(supply):
+    while True:
         turn += 1
-        name_list=[]
-        cost_list=[]
-        quantity_list=[]    
-        for value in supply_order:
-            for stack in supply_order[value]:
-                if stack in supply:
-                    name_list.append(stack)
-                    cost_list.append(value)
-                    quantity_list.append(len(supply[stack]))
-        supplydf=pandas.DataFrame(data={'Cost':cost_list,'Remaining':quantity_list}\
-                                  ,index=name_list)
         if not sp:
             print('\n\nSUPPLY')
-            print(supplydf)
+            print(supply[["cost","quantity"]])
             print('\r')
             print(cardsummaries(players).loc[['Total cards','VICTORY POINTS']])
             print("\nStart of turn " + str(turn))    
-        for player in players:
-            if not gameover(supply):
-                player.turn(players,supply,trash)
-                last_turn=player.order
-            else:
+        for player in players:  
+            player.turn(players,supply,trash)
+            last_turn=player.order
+            if supply.gameover():
                 break
+        else:
+            continue
+        break
 
     #Final scores and winners
     dcs=cardsummaries(players)
@@ -878,14 +841,13 @@ def playgame(player_names,suppress_printing):
         winners=high_scores2
     else:
         winners=high_scores1
-
     if len(winners)>1:
         winstring= ' and '.join(winners) + ' win!'
     else:
         winstring = ' '.join([winners[0],'wins!'])
-    
     if not sp:
         print("\n\nGAME OVER!!!   "+winstring+"\n")
+    
     display_order='Adventurer,Bureaucrat,Cellar,Chancellor,Chapel,Council Room,\
     ,Feast,Festival,Laboratory,Library,Market,Militia,Mine,Moat,Moneylender,\
     ,Remodel,Smithy,Spy,Thief,Throne Room,Village,Witch,Woodcutter,Workshop,\
@@ -900,10 +862,5 @@ def playgame(player_names,suppress_printing):
 
 #6. Play game when the file is called
 if __name__ == "__main__":
-    names1=["*Alex","*Ben"]
-    playgame(names1,suppress_printing=False)
-    
-#removed unused functions and imports
-#reworked choose_buy so computer and human match
-#simplified choose_discard for computer
-#eliminated internal getcard function for computer player
+    names1=["*Alex","*Ben","*Charlie","*Daniela"]
+    playgame(names1,suppress_printing=True)
