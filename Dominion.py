@@ -11,11 +11,13 @@ import pandas
 
 #1. Define Supply methods
 class Supply(pandas.DataFrame):
+    def lsi(self):
+        return list(self.index)
     def gameover(self):
         if self.loc['Province','quantity']==0:
             return True
         else:
-            return False
+            return len(self[self['quantity']==0])>2
     def remove(self,cname):
         self.loc[cname,'quantity']-=1
     def has(self,cname):
@@ -383,6 +385,7 @@ class Player():
     def __init__(self,name,order):
         self.name = name
         self.order = order
+        self.cycles = 0
         self.hand = []
         self.deck = [Copper()]*7 + [Estate()]*3
         random.shuffle(self.deck)
@@ -400,11 +403,12 @@ class Player():
         #defualt destination is player's hand
         if dest==None:
             dest = self.hand
-        #Replenish deck if necessary.
-        if len(self.deck)==0:
+        #Replenish deck if necessary and possible.
+        if len(self.deck)==0 and len(self.discard)>0:
             self.deck = self.discard
             self.discard = []
             random.shuffle(self.deck)
+            self.cycles +=1
         #If deck has cards, add card to destination list
         if len(self.deck)>0:
             c = self.deck.pop(0)
@@ -545,26 +549,27 @@ class ComputerPlayer(Player):
 
     def __init__(self,name,order,supply,sp):
         Player.__init__(self,name,order)
-        lsi = list(supply.index)
         #beginning and middle of game
         bg1 = ["Province","Gold","Laboratory","Festival","Witch",
         "Council Room","Market","Militia","Adventurer","Smithy","Bureaucrat","Silver","Moat",""]
-        self.buygaintable1 = [i for i in bg1 if i in lsi]
+        self.buygaintable1 = [i for i in bg1 if i in supply.lsi()]
         #end of game        
         bg2 = ["Province","Gardens","Duchy","Estate","Gold","Silver",""]
-        self.buygaintable2 = [i for i in bg2 if i in lsi]
+        self.buygaintable2 = [i for i in bg2 if i in supply.lsi()]
         #beginning and middle of the game, too many action cards
         bg3 =  ["Province","Gold","Festival","Laboratory","Market","Village",
         "Silver",""]
-        self.buygaintable3 = [i for i in bg3 if i in lsi]
+        self.buygaintable3 = [i for i in bg3 if i in supply.lsi()]
         action_order = ["Village","Festival","Market","Laboratory","Witch",
         "Council Room","Militia","Adventurer","Smithy","Bureaucrat","Moat"][::-1]
-        self.playtable1 = [i for i in action_order if i in lsi]
+        self.playtable1 = [i for i in action_order if i in supply.lsi()]
         discard_order = ["Gardens","Duchy","Province","Estate","Curse","Copper",
         "Village","Bureaucrat","Silver","Militia","Smithy","Council Room","Witch",
         "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
-        self.discardtable1 = [i for i in discard_order if i in lsi]
+        self.discardtable1 = [i for i in discard_order if i in supply.lsi()]
         self.sp=sp
+        self.loglist=[]
+        self.logdf=pandas.DataFrame()
     
     def choose_action(self):
         self.hand.sort(key = lambda x: Findex(x.name,self.playtable1))
@@ -590,6 +595,7 @@ class ComputerPlayer(Player):
 
     def turn(self,players,supply,trash):
         self.start_turn()
+        self.log(players,supply,trash)
         #action phase
         while self.actions>0 and 'action' in catinlist(self.hand):
             playthis = self.choose_action()
@@ -634,62 +640,26 @@ class ComputerPlayer(Player):
     
     def show(self,lead=""):
         pass
+    
+    def log(self,players,supply,trash):
+        pass
 
 class TablePlayer(ComputerPlayer):
     def __init__(self,name,order,supply,sp):
-        ComputerPlayer.__init__(self,name,order,sp) 
+        ComputerPlayer.__init__(self,name,order,supply,sp) 
         self.index=0
-        self.buygaintable=[]
         q=re.match(r'([a-zA-Z]+)(\d+)',name)
         if q:
             self.number = q.group(2)
         else:
             print(name)
-        self.playtable1 = ["Village","Festival","Market","Laboratory","Witch",
-        "Council Room","Militia","Adventurer","Smithy","Bureaucrat","Moat",""]
-        self.discardtable1 = ["Gardens","Duchy","Province","Estate","Curse","Copper",
-        "Village","Bureaucrat","Silver","Militia","Smithy","Council Room","Witch",
-        "Festival","Market","Adventurer","Laboratory","Gold","Moat"]
+        adjust_df=pandas.read_csv('/Users/odin/git/Dominion/adjustment_matrix.csv',index_col=0)
+        local_adj=adjust_df.loc[supply.lsi(),supply.lsi()]
+        sv=local_adj.sum().sort_values(ascending=False)
+        sv=sv[sv>0]
+        self.buygaintable1=list(sv.index)
+        self.cprint(sv)
     
-    def turn(self,players,supply,trash):
-        self.start.turn()
-        #action phase
-        self.index = 0
-        while self.actions>0 and 'action' in catinlist(self.hand):
-            playthis = self.choose_action()
-            if playthis:
-                c = getcard(playthis,supply,self.hand,"your hand",['action'])
-                if c:
-                    self.cprint(self.name + " plays " + c.name+ ". ")
-                    self.playcard(c,players,supply,trash)
-            else:
-                break
-        
-         #buy phase
-        v= self.number
-        csvstring = r"Dominionbuy" + str(v) + ".csv"
-        buydf=pandas.read_csv(csvstring,na_filter=False)
-        sortedbuydf=buydf.sort_values("Buyvalues",ascending=False)
-        ranktable = sortedbuydf.Cardname
-        self.index = 0
-        for c in self.hand:
-            self.purse += c.buypower
-        while self.buys>0:
-            purchase = ranktable.iloc[self.index]
-            if not purchase:
-                break
-            else:
-                c = getcard(purchase,supply,upto=self.purse)
-                if c:
-                    self.discard.append(c)
-                    supply.remove(purchase)
-                    self.index = 0
-                    self.buys = self.buys -1
-                    self.purse = self.purse - c.cost
-                else:
-                    self.index += 1
-                    
-        self.cleanup()
     
 #4. Define global functions        
 def namesinlist(cardlist):
@@ -757,6 +727,8 @@ def Findex(item,List):
     except:
         return -1
 
+def analyze_results(players,supply,trash,turn,winners):
+    return [p.cycles for p in players]
 
 #5. Define game execution        
 def playgame(player_names,suppress_printing):
@@ -830,7 +802,6 @@ def playgame(player_names,suppress_printing):
     vpmax=vp.max()
     high_scores2=[]
     high_scores1=[]
-    winners=[]
     for player in players:
         if vp.loc[player.name]==vpmax:
             if player.order>last_turn:
@@ -841,26 +812,27 @@ def playgame(player_names,suppress_printing):
         winners=high_scores2
     else:
         winners=high_scores1
-    if len(winners)>1:
-        winstring= ' and '.join(winners) + ' win!'
-    else:
-        winstring = ' '.join([winners[0],'wins!'])
-    if not sp:
-        print("\n\nGAME OVER!!!   "+winstring+"\n")
     
-    display_order='Adventurer,Bureaucrat,Cellar,Chancellor,Chapel,Council Room,\
-    ,Feast,Festival,Laboratory,Library,Market,Militia,Mine,Moat,Moneylender,\
-    ,Remodel,Smithy,Spy,Thief,Throne Room,Village,Witch,Woodcutter,Workshop,\
-    ,Gold,Silver,Copper,Province,Duchy,Gardens,Estate,Curse,Total cards,\
-    ,VICTORY POINTS'.split(',')
-    newindex=[card for card in display_order if card in dcs.index]
     if sp:
-        return winners
+        return winners,analyze_results(players,supply,trash,turn,winners)
     else:
+        if len(winners)>1:
+            winstring= ' and '.join(winners) + ' win!'
+        else:
+            winstring = ' '.join([winners[0],'wins!'])
+        if not sp:
+            print("\n\nGAME OVER!!!   "+winstring+"\n")
+        
+        display_order='Adventurer,Bureaucrat,Cellar,Chancellor,Chapel,Council Room,\
+        ,Feast,Festival,Laboratory,Library,Market,Militia,Mine,Moat,Moneylender,\
+        ,Remodel,Smithy,Spy,Thief,Throne Room,Village,Witch,Woodcutter,Workshop,\
+        ,Gold,Silver,Copper,Province,Duchy,Gardens,Estate,Curse,Total cards,\
+        ,VICTORY POINTS'.split(',')
+        newindex=[card for card in display_order if card in dcs.index]
         print(dcs.reindex(newindex))
         print("\n")       
 
 #6. Play game when the file is called
 if __name__ == "__main__":
-    names1=["*Alex","*Ben","*Charlie","*Daniela"]
-    playgame(names1,suppress_printing=True)
+    names1=["Alex","*Ben","^Cynthia"]
+    playgame(names1,suppress_printing=False)
