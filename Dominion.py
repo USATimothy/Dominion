@@ -645,20 +645,16 @@ class ComputerPlayer(Player):
         pass
 
 class TablePlayer(ComputerPlayer):
-    def __init__(self,name,order,supply,sp):
+    def __init__(self,name,adjust_df,order,supply,sp):
         ComputerPlayer.__init__(self,name,order,supply,sp) 
         self.index=0
-        q=re.match(r'([a-zA-Z]+)(\d+)',name)
-        if q:
-            self.number = q.group(2)
-        else:
-            print(name)
-        adjust_df=pandas.read_csv('/Users/odin/git/Dominion/adjustment_matrix.csv',index_col=0)
-        local_adj=adjust_df.loc[supply.lsi(),supply.lsi()]
-        sv=local_adj.sum().sort_values(ascending=False)
+        if adjust_df is None:
+            adjust_df=pandas.read_csv('adjustment_matrix.csv',index_col=0)
+        self.df=adjust_df.copy()
+        self.local_adj=self.df.loc[supply.lsi(),supply.lsi()]
+        sv=self.local_adj.sum().sort_values(ascending=False)
         sv=sv[sv>0]
         self.buygaintable1=list(sv.index)
-        self.cprint(sv)
     
     
 #4. Define global functions        
@@ -728,7 +724,7 @@ def Findex(item,List):
         return -1
 
 def analyze_results(players,supply,trash,turn,winners):
-    return [p.cycles for p in players]
+    return supply.lsi()
 
 #5. Define game execution        
 def playgame(player_names,suppress_printing):
@@ -770,10 +766,10 @@ def playgame(player_names,suppress_printing):
     #Costruct the Player objects
     players = []
     for play_order,name in enumerate(player_names):
-        if name[0]=="*":
+        if type(name) is tuple:
+           players.append(TablePlayer(name[0],name[1],play_order,supply,sp)) 
+        elif name[0]=="*":
             players.append(ComputerPlayer(name[1:],play_order,supply,sp))
-        elif name[0]=="^":
-            players.append(TablePlayer(name[1:],play_order,supply,sp))
         else:
             players.append(Player(name,play_order))
     
@@ -834,5 +830,6 @@ def playgame(player_names,suppress_printing):
 
 #6. Play game when the file is called
 if __name__ == "__main__":
-    names1=["Alex","*Ben","^Cynthia"]
+    adf=pandas.read_csv('adjustment_matrix.csv',index_col=0)
+    names1=["Alex","*Ben",("Cynthia",adf)]
     playgame(names1,suppress_printing=False)
