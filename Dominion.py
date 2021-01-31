@@ -655,8 +655,21 @@ class TablePlayer(ComputerPlayer):
         sv=self.local_adj.sum().sort_values(ascending=False)
         sv=sv[sv>0]
         self.buygaintable1=list(sv.index)
-    
-    
+
+class Adam(ComputerPlayer):
+    def __init__(self,name,order,supply,sp):
+        ComputerPlayer.__init__(self,name,order,supply,sp)
+
+class Bonnie(TablePlayer):
+    def __init__(self,name,order,supply,sp):
+        adf=pandas.read_csv('Bonnie_adjustment_matrix.csv',index_col=0)
+        TablePlayer.__init__(self,name,adf,order,supply,sp)
+
+class Chelsea(TablePlayer):
+    def __init__(self,name,order,supply,sp):
+        adf=pandas.read_csv('Chelsea_adjustment_matrix.csv',index_col=0)
+        TablePlayer.__init__(self,name,adf,order,supply,sp)
+        
 #4. Define global functions        
 def namesinlist(cardlist):
     namelist = []    
@@ -769,7 +782,13 @@ def playgame(player_names,suppress_printing):
         if type(name) is tuple:
            players.append(TablePlayer(name[0],name[1],play_order,supply,sp)) 
         elif name[0]=="*":
-            players.append(ComputerPlayer(name[1:],play_order,supply,sp))
+            pname=name[1:]
+            if pname[0].lower()=='b':
+                players.append(Bonnie(pname,play_order,supply,sp))
+            elif pname[0].lower()=='c':
+                players.append(Chelsea(pname,play_order,supply,sp))
+            else:
+                players.append(Adam(pname,play_order,supply,sp))
         else:
             players.append(Player(name,play_order))
     
@@ -831,5 +850,5 @@ def playgame(player_names,suppress_printing):
 #6. Play game when the file is called
 if __name__ == "__main__":
     adf=pandas.read_csv('adjustment_matrix.csv',index_col=0)
-    names1=["Alex","*Ben",("Cynthia",adf)]
+    names1=["*Alex","*Ben","*Cynthia"]
     playgame(names1,suppress_printing=False)
